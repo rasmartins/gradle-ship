@@ -21,48 +21,53 @@ import org.apache.commons.io.FileUtils
 import org.apache.tools.ant.filters.ReplaceTokens
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.file.CopySpec
 import org.gradle.api.tasks.bundling.Compression
 import org.gradle.api.tasks.bundling.Tar
 import org.gradle.internal.os.OperatingSystem
 
 class ShipPlugin implements Plugin<Project> {
-    static GROUP = "Application Shipping"
+    static GROUP_SHIP = "Application shipping"
+    static GROUP_DLOAD = "Download"
 
     void apply(Project project) {
         project.extensions.create("ship", ShipPluginExtension)
 
         project.afterEvaluate {
-            project.task("bundleAll", group: GROUP, dependsOn: project.tasks.matching { task -> task.name.startsWith("bundleDist") }) {
-            }
+            def shipTasks = []
 
             project.ship.jvms.vms.each { jvm ->
                 createDownloadTask(project, jvm)
+                def task;
                 if (jvm.os == "windows") {
-                    createNsisTask(project, jvm)
+                    task = createNsisTask(project, jvm)
                 } else {
-                    createTarTask(project, jvm)
+                    task = createTarTask(project, jvm)
                 }
+                shipTasks.add(task)
+            }
+
+            project.task("shipAll", group: GROUP_SHIP, dependsOn: shipTasks) {
+                description("Create packages for all configured targets")
             }
         }
     }
 
-    static void ensureDestinationFolder(Project project) {
+    def ensureDestinationFolder(Project project) {
         if (!project.ship.destination)
-            project.ship.destination = project.file("${project.buildDir}/bundles")
+            project.ship.destination = project.file("${project.buildDir}/ship")
     }
 
-    static String getPackageName(Project project, Jvm jvm) {
+    def getPackageName(Project project, Jvm jvm) {
         return "${project.ship.product.id}-${project.ship.product.version}-${jvm.os}-${jvm.arch}"
     }
 
-    static File getPackageDir(Project project) {
+    def getPackageDir(Project project) {
         project.file("${project.buildDir}/distributions")
     }
 
-    static void createDownloadTask(Project project, Jvm jvm) {
-        project.task("downloadJvm${jvm.safeName()}", group: GROUP) {
-            description "Download Oracle Java Runtime Environment packages ($jvm)"
+    def createDownloadTask(Project project, Jvm jvm) {
+        project.task("getJvm${jvm.safeName()}", group: GROUP_DLOAD) {
+            description "Download JRE for platform $jvm.os-$jvm.arch"
 
             doLast {
                 ensureDestinationFolder(project)
@@ -107,7 +112,18 @@ class ShipPlugin implements Plugin<Project> {
         }
     }
 
-    static CopySpec copyContents(Project project, Jvm jvm) {
+    def extractResource(Project project, URL url) {
+        String baseName = new File(url.getPath()).getName()
+        File destinationFile = project.file("${project.buildDir}/ship/tmp/${baseName}")
+        FileUtils.copyInputStreamToFile(url.openStream(), destinationFile)
+        return destinationFile
+    }
+
+    def getLauncherExe(Jvm jvm) {
+        return getClass().getClassLoader().getResource("launcher/launcher-${jvm.os}-${jvm.arch}.exe");
+    }
+
+    def copyContents(Project project, Jvm jvm) {
         return project.copySpec {
             with {
                 into('jvm') {
@@ -116,18 +132,20 @@ class ShipPlugin implements Plugin<Project> {
             }
 
             with(project.ship.contents)
-            from(project.ship.launcherJar)
-            from(project.ship.launcherExe)
-            from(project.ship.launcherJvmArgs) {
+            from(extractResource(project, project.ship.launcherJar))
+            from(extractResource(project, getLauncherExe(jvm)))
+            from(extractResource(project, project.ship.launcherJvmEnvs))
+            from(extractResource(project, project.ship.launcherJvmArgs)) {
                 filter(ReplaceTokens, tokens: [JARNAME: "${project.name}-${project.version}.jar".toString()])
                 filteringCharset = 'UTF-8'
             }
-            from(project.ship.launcherJvmEnvs)
         }
     }
 
-    static void createTarTask(Project project, Jvm jvm) {
-        project.task("bundleDist${jvm.safeName()}", type: Tar, group: GROUP, dependsOn: "downloadJvm${jvm.safeName()}") {
+    def createTarTask(Project project, Jvm jvm) {
+        project.task("ship${jvm.safeName()}", type: Tar, group: GROUP_SHIP, dependsOn: "getJvm${jvm.safeName()}") {
+            description "Create package for platform $jvm.os-$jvm.arch"
+
             ensureDestinationFolder(project)
 
             archiveName getPackageName(project, jvm) + ".tar.gz"
@@ -140,8 +158,10 @@ class ShipPlugin implements Plugin<Project> {
         }
     }
 
-    static void createNsisTask(Project project, Jvm jvm) {
-        project.task("bundleDist${jvm.safeName()}", group: GROUP, dependsOn: "downloadJvm${jvm.safeName()}") {
+    def createNsisTask(Project project, Jvm jvm) {
+        project.task("ship${jvm.safeName()}", group: GROUP_SHIP, dependsOn: "getJvm${jvm.safeName()}") {
+            description "Create installer for platform $jvm.os-$jvm.arch"
+
             doLast {
                 ensureDestinationFolder(project)
 
@@ -167,7 +187,7 @@ class ShipPlugin implements Plugin<Project> {
 
                 // Generate NSIS script.
                 project.copy {
-                    from project.ship.nsisTemplate
+                    from extractResource(project, project.ship.nsisTemplate)
                     into scriptFolder
                     filter(ReplaceTokens, tokens: coreTokens)
                     filter(ReplaceTokens, tokens: project.ship.nsisTokens)

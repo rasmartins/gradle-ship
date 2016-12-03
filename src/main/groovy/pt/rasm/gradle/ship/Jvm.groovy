@@ -16,16 +16,16 @@ class Jvm {
     // Build number.
     int build
 
-    URL url() {
+    def url() {
         def version = "${major}u${update}"
         return new URL("${url}/${version}-b${build}/jre-${version}-${os}-${arch}.tar.gz")
     }
 
-    String folderName() {
+    def folderName() {
         return "jre-${major}u${update}-b${build}-${os}-${arch}"
     }
 
-    String safeName() {
+    def safeName() {
         return StringUtils.capitalize(os) + StringUtils.capitalize(arch)
     }
 

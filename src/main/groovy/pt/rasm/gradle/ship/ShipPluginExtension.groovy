@@ -29,8 +29,6 @@ class ShipPluginExtension {
     def nsisTokens = []
     /** Launcher JAR. */
     def launcherJar = getClass().getClassLoader().getResource("launcher/launcher.jar")
-    /** Launcher executable. */
-    def launcherExe = getClass().getClassLoader().getResource("launcher/launcher.exe")
     def launcherJvmArgs = getClass().getClassLoader().getResource("launcher/jvm.args")
     def launcherJvmEnvs = getClass().getClassLoader().getResource("launcher/jvm.envs")
     // Bundle contents (CopySpec compatible).
