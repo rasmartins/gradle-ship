@@ -1,0 +1,2 @@
+appendPath LD_LIBRARY_PATH @rootFolder@/natives
+appendPath PATH @rootFolder@/natives

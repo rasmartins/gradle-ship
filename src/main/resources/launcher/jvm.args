@@ -1,0 +1,7 @@
+-Dneptus.home=@rootFolder@
+-Djava.library.path=@rootFolder@/natives
+-Xms10m
+-Xmx1024m
+-XX:+HeapDumpOnOutOfMemoryError
+-cp
+@rootFolder@/conf:@rootFolder@/lib/@JARNAME@
