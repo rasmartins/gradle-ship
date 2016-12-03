@@ -20,7 +20,7 @@ class ShipPlugin implements Plugin<Project> {
             project.task("bundleAll", group: GROUP, dependsOn: project.tasks.matching { task -> task.name.startsWith("bundleDist") }) {
             }
 
-            project.bundler.jvms.vms.each { jvm ->
+            project.ship.jvms.vms.each { jvm ->
                 createDownloadTask(project, jvm)
                 if (jvm.os == "windows") {
                     createNsisTask(project, jvm)
@@ -32,16 +32,16 @@ class ShipPlugin implements Plugin<Project> {
     }
 
     static void ensureDestinationFolder(Project project) {
-        if (!project.bundler.destination)
-            project.bundler.destination = project.file("${project.buildDir}/bundles")
+        if (!project.ship.destination)
+            project.ship.destination = project.file("${project.buildDir}/bundles")
     }
 
     static String getPackageName(Project project, Jvm jvm) {
-        return "${project.bundler.product.id}-${project.bundler.product.version}-${jvm.os}-${jvm.arch}"
+        return "${project.ship.product.id}-${project.ship.product.version}-${jvm.os}-${jvm.arch}"
     }
 
     static File getPackageDir(Project project) {
-        project.file("${project.buildDir}/bundles/dist")
+        project.file("${project.buildDir}/distributions")
     }
 
     static void createDownloadTask(Project project, Jvm jvm) {
@@ -51,7 +51,7 @@ class ShipPlugin implements Plugin<Project> {
             doLast {
                 ensureDestinationFolder(project)
 
-                File jreFolder = project.file("${project.bundler.destination}/jvms")
+                File jreFolder = project.file("${project.ship.destination}/jvms")
                 jreFolder.mkdirs()
 
                 def url = jvm.url()
@@ -95,18 +95,18 @@ class ShipPlugin implements Plugin<Project> {
         return project.copySpec {
             with {
                 into('jvm') {
-                    from("${project.bundler.destination}/jvms/${jvm.folderName()}")
+                    from("${project.ship.destination}/jvms/${jvm.folderName()}")
                 }
             }
 
-            with(project.bundler.contents)
-            from(project.bundler.launcherJar)
-            from(project.bundler.launcherExe)
-            from(project.bundler.launcherJvmArgs) {
+            with(project.ship.contents)
+            from(project.ship.launcherJar)
+            from(project.ship.launcherExe)
+            from(project.ship.launcherJvmArgs) {
                 filter(ReplaceTokens, tokens: [JARNAME: "${project.name}-${project.version}.jar".toString()])
                 filteringCharset = 'UTF-8'
             }
-            from(project.bundler.launcherJvmEnvs)
+            from(project.ship.launcherJvmEnvs)
         }
     }
 
@@ -130,19 +130,19 @@ class ShipPlugin implements Plugin<Project> {
                 ensureDestinationFolder(project)
 
                 def script = "${jvm.toString()}.nsi"
-                def scriptFolder = project.file("${project.bundler.destination}/nsis")
+                def scriptFolder = project.file("${project.ship.destination}/nsis")
                 def scriptPath = project.file("$scriptFolder/$script").absolutePath
-                def distFolder = project.file("${project.bundler.destination}/nsis/dist-${jvm.os}-${jvm.arch}")
+                def distFolder = project.file("${project.ship.destination}/nsis/dist-${jvm.os}-${jvm.arch}")
                 def outFile = project.file("${getPackageDir(project)}/${getPackageName(project, jvm)}.exe")
 
                 def coreTokens = [
-                        PRODUCT_NAME   : project.bundler.product.name,
-                        PRODUCT_ID     : project.bundler.product.id,
-                        PRODUCT_VERSION: project.bundler.product.version,
-                        LICENSE        : project.bundler.product.license.absolutePath,
-                        ICON           : project.bundler.product.installIcon.absolutePath,
-                        HEADER         : project.bundler.product.installHeader.absolutePath,
-                        EXE            : project.bundler.product.id + ".exe",
+                        PRODUCT_NAME   : project.ship.product.name,
+                        PRODUCT_ID     : project.ship.product.id,
+                        PRODUCT_VERSION: project.ship.product.version,
+                        LICENSE        : project.ship.product.license.absolutePath,
+                        ICON           : project.ship.product.installIcon.absolutePath,
+                        HEADER         : project.ship.product.installHeader.absolutePath,
+                        EXE            : project.ship.product.id + ".exe",
                         DISTRIBUTION   : distFolder.absolutePath,
                         ARCH           : jvm.arch,
                         OUTFILE        : outFile.absolutePath
@@ -151,10 +151,10 @@ class ShipPlugin implements Plugin<Project> {
 
                 // Generate NSIS script.
                 project.copy {
-                    from project.bundler.nsisTemplate
+                    from project.ship.nsisTemplate
                     into scriptFolder
                     filter(ReplaceTokens, tokens: coreTokens)
-                    filter(ReplaceTokens, tokens: project.bundler.nsisTokens)
+                    filter(ReplaceTokens, tokens: project.ship.nsisTokens)
                     rename { script }
                     filteringCharset = 'UTF-8'
                 }
