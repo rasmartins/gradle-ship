@@ -120,7 +120,8 @@ class ShipPlugin implements Plugin<Project> {
     }
 
     def getLauncherExe(Jvm jvm) {
-        return getClass().getClassLoader().getResource("launcher/launcher-${jvm.os}-${jvm.arch}.exe");
+        def exe = "launcher/launcher-${jvm.os}-${jvm.arch}.exe"
+        return getClass().getClassLoader().getResource(exe)
     }
 
     def copyContents(Project project, Jvm jvm) {

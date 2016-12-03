@@ -14,40 +14,41 @@
 // limitations under the License.                                              *
 //******************************************************************************
 
-package pt.rasm.gradle.ship
+#ifndef WIN_H_INCLUDED_
+#define WIN_H_INCLUDED_
 
-class ShipPluginExtension {
-    /** Product details. */
-    def product
-    /** Runtime environments. */
-    def jvms
-    /** Destination folder for generated files. */
-    def destination
-    /** NSIS template. */
-    def nsisTemplate = getClass().getClassLoader().getResource("nsis/template.nsi")
-    /** NSIS template tokens. */
-    def nsisTokens = []
-    /** Launcher JAR. */
-    def launcherJar = getClass().getClassLoader().getResource("launcher/launcher.jar")
-    def launcherJvmArgs = getClass().getClassLoader().getResource("launcher/jvm.args")
-    def launcherJvmEnvs = getClass().getClassLoader().getResource("launcher/jvm.envs")
-    // Bundle contents (CopySpec compatible).
-    def contents
+#include <stdio.h>
+#include <stdbool.h>
 
-    ShipPluginExtension() {
-        println(launcherJar)
-        println(launcherJvmArgs)
-        println(launcherJvmEnvs)
+#include <process.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <windows.h>
 
-    }
+#define PATH_SEP '\\'
 
-    def javaRuntime(args, closure) {
-        jvms = new Jvms(args)
-        jvms.with(closure)
-    }
-
-    def product(args) {
-        product = new Product()
-        product.with(args)
-    }
+static inline int
+ship_find_exe_path(char* bfr, size_t bfr_size)
+{
+  return GetModuleFileName(NULL, bfr, bfr_size - 1);
 }
+
+static inline bool
+ship_file_exists(const char* path)
+{
+  struct _stat ss;
+  int rv = _stat(path, &ss);
+  if (rv != 0)
+    return false;
+
+  return S_ISREG(ss.st_mode);
+}
+
+void
+ship_execute(const char* program, char** argv, int argc)
+{
+  int rv = _spawnvp(P_OVERLAY, program, (const char* const*)argv);
+  fprintf(stderr, "ERROR: failed to spawn process (%d)\n", rv);
+}
+
+#endif
